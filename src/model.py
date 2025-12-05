@@ -58,24 +58,38 @@ class MoELayer(nn.Module):
           out: [B, S, D]
           aux_loss: scalar tensor
         """
-        top2_val, top2_idx, gate = self.router(x)
+        top2_val, top2_idx, gate = self.router(x)  # [B,S,2], [B,S,2], [B,S,E]
 
         B, S, D = x.shape
-        out = torch.zeros_like(x)
+        N = B * S
+
+        x_flat = x.view(N, D)                    # [N, D]
+        out_flat = torch.zeros_like(x_flat)      # [N, D]
 
         aux_loss = self._aux_loss(gate)
 
-        # Naive implementation, đủ cho batch nhỏ trên Kaggle
-        for b in range(B):
-            for s in range(S):
-                token = x[b, s]  # [D]
-                y = 0.0
-                for k in range(2):
-                    e_idx = top2_idx[b, s, k].item()
-                    w = top2_val[b, s, k]
-                    y = y + w * self.experts[e_idx](token)
-                out[b, s] = y
+        # Flatten top2
+        top2_val_flat = top2_val.view(N, 2)      # [N, 2]
+        top2_idx_flat = top2_idx.view(N, 2)      # [N, 2]
 
+        # Mỗi k tương ứng với top-1 và top-2 expert
+        for k in range(2):
+            idx_k = top2_idx_flat[:, k]          # [N]
+            w_k = top2_val_flat[:, k]            # [N]
+
+            # Lặp theo expert, nhưng KHÔNG lặp theo token
+            for e, expert in enumerate(self.experts):
+                mask = (idx_k == e)              # [N] bool
+                if not mask.any():
+                    continue
+
+                tokens_e = x_flat[mask]          # [M, D]
+                y_e = expert(tokens_e)           # [M, D]
+                w_e = w_k[mask].unsqueeze(1)     # [M, 1]
+
+                out_flat[mask] += w_e * y_e      # accumulate
+
+        out = out_flat.view(B, S, D)
         return out, aux_loss
 
     def _aux_loss(self, gate):
@@ -83,11 +97,9 @@ class MoELayer(nn.Module):
         gate: [B, S, n_experts]
         Load balancing loss kiểu GShard rất đơn giản
         """
-        # mean trên batch và sequence
         expert_prob = gate.mean(dim=(0, 1))        # [n_experts]
         balance_loss = torch.sum(expert_prob * torch.log(expert_prob + 1e-9))
         return balance_loss
-
 
 # ===== Positional encoding =====
 
