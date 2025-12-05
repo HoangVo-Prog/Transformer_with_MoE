@@ -234,7 +234,7 @@ class MoETransformerMT(nn.Module):
         # Embeddings
         self.src_emb = nn.Embedding(src_vocab_size, d_model)
         self.tgt_emb = nn.Embedding(tgt_vocab_size, d_model)
-        self.pos_enc = PositionalEncoding(d_model, max_len=max_len)
+        self.pos_enc = PositionalEncoding(d_model, max_len=max_len+5)
 
         # Encoder stack
         self.encoder_layers = nn.ModuleList([
