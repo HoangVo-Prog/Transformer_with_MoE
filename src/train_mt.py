@@ -1,6 +1,6 @@
 # train_mt.py
 import argparse
-import math
+import math, time
 import os
 from typing import List, Tuple
 
@@ -142,7 +142,8 @@ def train_one_epoch(
     total_loss = 0.0
     total_tokens = 0
 
-    for batch in train_loader:
+    start_epoch = time.time()
+    for step, batch in enumerate(train_loader):
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
         src_ids = src_ids.to(device)
         tgt_in = tgt_in.to(device)
@@ -156,6 +157,8 @@ def train_one_epoch(
             src_key_padding_mask=src_pad_mask,
             tgt_key_padding_mask=tgt_pad_mask,
         )
+        
+        t_after_forward = time.time()
 
         B, T, V = logits.size()
         loss_main = criterion(
@@ -168,6 +171,17 @@ def train_one_epoch(
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
+        
+        t_after_step = time.time()
+
+        if step % 100 == 0:
+            print(
+                f"step {step} "
+                f"batch {t_after_batch - t0:.3f}s "
+                f"to(device) {t_after_to - t_after_batch:.3f}s "
+                f"forward {t_after_forward - t_after_to:.3f}s "
+                f"opt {t_after_step - t_after_forward:.3f}s"
+            )
 
         # thống kê
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
@@ -226,16 +240,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--data-dir", type=str, default="data")
-    parser.add_argument("--d_model", type=int, default=256)
+    parser.add_argument("--d_model", type=int, default=192)
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
     parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=1024)
-    parser.add_argument("--n_experts", type=int, default=8)
+    parser.add_argument("--d_ff", type=int, default=768)
+    parser.add_argument("--n_experts", type=int, default=4)
     parser.add_argument("--max_len", type=int, default=128)
     parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--num_workers", type=int, default=2)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lambda_aux", type=float, default=1e-2)

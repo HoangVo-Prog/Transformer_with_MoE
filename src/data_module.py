@@ -15,24 +15,23 @@ class TranslationDataset(Dataset):
     ):
         assert len(src_texts) == len(tgt_texts)
 
-        self.src_texts = src_texts
-        self.tgt_texts = tgt_texts
-        self.src_tok = src_tokenizer
-        self.tgt_tok = tgt_tokenizer
         self.max_len = max_len
 
+        # PRE TOKENIZE MỘT LẦN
+        self.src_ids = []
+        self.tgt_ids = []
+
+        for src, tgt in zip(src_texts, tgt_texts):
+            s_ids = src_tokenizer(src)[: self.max_len]
+            t_ids = tgt_tokenizer(tgt)[: self.max_len]
+            self.src_ids.append(torch.tensor(s_ids, dtype=torch.long))
+            self.tgt_ids.append(torch.tensor(t_ids, dtype=torch.long))
+
     def __len__(self):
-        return len(self.src_texts)
+        return len(self.src_ids)
 
     def __getitem__(self, idx):
-        src = self.src_texts[idx]
-        tgt = self.tgt_texts[idx]
-
-        src_ids = self.src_tok(src)[: self.max_len]
-        tgt_ids = self.tgt_tok(tgt)[: self.max_len]
-
-        return torch.tensor(src_ids, dtype=torch.long), torch.tensor(tgt_ids, dtype=torch.long)
-
+        return self.src_ids[idx], self.tgt_ids[idx]
 
 # 2. Collate function cho một batch dịch
 def collate_translation_batch(
@@ -126,7 +125,9 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        collate_fn=collate_fn
+        collate_fn=collate_fn,
+        pin_memory=True,
+        persistent_workers=True if num_workers > 0 else False,
     )
 
     val_loader = DataLoader(
@@ -134,7 +135,9 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        collate_fn=collate_fn
+        collate_fn=collate_fn,
+        pin_memory=True,
+        persistent_workers=True if num_workers > 0 else False,
     )
 
     test_loader = DataLoader(
@@ -142,7 +145,9 @@ def create_dataloaders(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        collate_fn=collate_fn
+        collate_fn=collate_fn,
+        pin_memory=True,
+        persistent_workers=True if num_workers > 0 else False,
     )
-
+    
     return train_loader, val_loader, test_loader
