@@ -27,6 +27,8 @@ def prepare_iwslt2015_en_vi(output_dir: str = "data"):
     print("Loading Hugging Face dataset thainq107/iwslt2015-en-vi")
     ds = load_dataset("thainq107/iwslt2015-en-vi")
 
+    os.makedirs(output_dir, exist_ok=True)
+
     # Mappings: split Hugging Face -> prefix file
     split_map = {
         "train": "train",
@@ -37,19 +39,29 @@ def prepare_iwslt2015_en_vi(output_dir: str = "data"):
     for split_name, prefix in split_map.items():
         if split_name not in ds:
             continue
-        split = ds[split_name]
 
+        split = ds[split_name]
         vi_list = split["vi"]
         en_list = split["en"]
 
-        print(f"{split_name}: {len(vi_list)} sentence pairs")
+        assert len(vi_list) == len(en_list), f"{split_name}: vi and en length mismatch before writing"
 
-        write_list(os.path.join(output_dir, f"{prefix}.vi"), vi_list)
-        write_list(os.path.join(output_dir, f"{prefix}.en"), en_list)
+        out_vi = os.path.join(output_dir, f"{prefix}.vi")
+        out_en = os.path.join(output_dir, f"{prefix}.en")
+
+        kept = 0
+        with open(out_vi, "w", encoding="utf-8") as f_vi, open(out_en, "w", encoding="utf-8") as f_en:
+            for vi, en in zip(vi_list, en_list):
+                vi = "" if vi is None else str(vi).strip()
+                en = "" if en is None else str(en).strip()
+                f_vi.write(vi + "\n")
+                f_en.write(en + "\n")
+                kept += 1
+
+        print(f"{split_name}: original {len(vi_list)} pairs, wrote {kept} pairs to {prefix}.vi/.en")
 
     print(f"Saved text files into {output_dir}/")
     print("Done.")
-
 
 if __name__ == "__main__":
     import argparse
