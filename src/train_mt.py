@@ -144,12 +144,16 @@ def train_one_epoch(
 
     start_epoch = time.time()
     for step, batch in enumerate(train_loader):
+        t0 = time.time()
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
-        src_ids = src_ids.to(device)
-        tgt_in = tgt_in.to(device)
-        tgt_out = tgt_out.to(device)
-        src_pad_mask = src_pad_mask.to(device)
-        tgt_pad_mask = tgt_pad_mask.to(device)
+        t_after_batch = time.time()
+
+        src_ids = src_ids.to(device, non_blocking=True)
+        tgt_in = tgt_in.to(device, non_blocking=True)
+        tgt_out = tgt_out.to(device, non_blocking=True)
+        src_pad_mask = src_pad_mask.to(device, non_blocking=True)
+        tgt_pad_mask = tgt_pad_mask.to(device, non_blocking=True)
+        t_after_to = time.time()
 
         logits, aux_loss = model(
             src_ids=src_ids,
@@ -157,7 +161,6 @@ def train_one_epoch(
             src_key_padding_mask=src_pad_mask,
             tgt_key_padding_mask=tgt_pad_mask,
         )
-        
         t_after_forward = time.time()
 
         B, T, V = logits.size()
