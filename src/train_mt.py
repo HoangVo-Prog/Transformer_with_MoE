@@ -312,7 +312,7 @@ def main():
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
     parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=512)
+    parser.add_argument("--d_ff", type=int, default=1024)
     parser.add_argument("--n_experts", type=int, default=4)
     parser.add_argument("--max_len", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.1)
