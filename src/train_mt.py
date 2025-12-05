@@ -13,35 +13,34 @@ from model import MoETransformerMT, count_parameters
 from data_module import create_dataloaders
 from utils import get_device, set_seed, save_checkpoint
 
+from prepare_vi_en_data import prepare_iwslt2015_en_vi
 
-# =========================
-# 1. Ví dụ hàm load dữ liệu
-# =========================
 
-def load_parallel_corpus_dummy() -> Tuple[
-    List[str], List[str], List[str], List[str], List[str], List[str]
-]:
-    """
-    Placeholder cho phần load dữ liệu.
-    Ở đây mình tạo vài câu toy để bạn có thể chạy thử.
-    Thực tế bạn thay hàm này bằng đọc file TSV, CSV, JSON gì đó.
-    """
-    train_src = [
-        "xin chao the gioi",
-        "toi dang thu train mo hinh",
-        "day la mot vi du don gian",
-    ]
-    train_tgt = [
-        "hello world",
-        "i am trying to train a model",
-        "this is a simple example",
-    ]
+def read_lines(path: str):
+    with open(path, encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
 
-    # cho ví dụ nhỏ, reuse y như train
-    val_src = train_src
-    val_tgt = train_tgt
-    test_src = train_src
-    test_tgt = train_tgt
+
+def load_parallel_corpus_from_files(
+    root: str = "data",
+    train_prefix: str = "train",
+    val_prefix: str = "val",
+    test_prefix: str = "test",
+    src_ext: str = "vi",
+    tgt_ext: str = "en",
+):
+    train_src = read_lines(os.path.join(root, f"{train_prefix}.{src_ext}"))
+    train_tgt = read_lines(os.path.join(root, f"{train_prefix}.{tgt_ext}"))
+
+    val_src = read_lines(os.path.join(root, f"{val_prefix}.{src_ext}"))
+    val_tgt = read_lines(os.path.join(root, f"{val_prefix}.{tgt_ext}"))
+
+    test_src = read_lines(os.path.join(root, f"{test_prefix}.{src_ext}"))
+    test_tgt = read_lines(os.path.join(root, f"{test_prefix}.{tgt_ext}"))
+
+    assert len(train_src) == len(train_tgt)
+    assert len(val_src) == len(val_tgt)
+    assert len(test_src) == len(test_tgt)
 
     return train_src, train_tgt, val_src, val_tgt, test_src, test_tgt
 
@@ -79,7 +78,7 @@ class SimpleVocab:
         self.eos_id = self.stoi[self.eos_token]
         self.unk_id = self.stoi[self.unk_token]
 
-    def encode(self, text: str, add_bos_eos: bool = False) -> List[int]:
+    def encode(self, text: str, add_bos_eos: bool = False):
         toks = text.strip().split()
         ids = [self.stoi.get(t, self.unk_id) for t in toks]
         if add_bos_eos:
@@ -99,6 +98,32 @@ class SimpleVocab:
     def __len__(self):
         return len(self.itos)
 
+    # thêm 2 hàm dưới để save - load state
+
+    def to_state(self):
+        return {
+            "itos": self.itos,
+            "pad_token": self.pad_token,
+            "bos_token": self.bos_token,
+            "eos_token": self.eos_token,
+            "unk_token": self.unk_token,
+        }
+
+    @classmethod
+    def from_state(cls, state):
+        obj = cls(texts=[])
+        obj.itos = state["itos"]
+        obj.stoi = {t: i for i, t in enumerate(obj.itos)}
+        obj.pad_token = state["pad_token"]
+        obj.bos_token = state["bos_token"]
+        obj.eos_token = state["eos_token"]
+        obj.unk_token = state["unk_token"]
+
+        obj.pad_id = obj.stoi[obj.pad_token]
+        obj.bos_id = obj.stoi[obj.bos_token]
+        obj.eos_id = obj.stoi[obj.eos_token]
+        obj.unk_id = obj.stoi[obj.unk_token]
+        return obj
 
 # =========================
 # 3. Train, eval loop
@@ -200,6 +225,7 @@ def evaluate(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--data-dir", type=str, default="data")
     parser.add_argument("--d_model", type=int, default=256)
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
@@ -219,15 +245,29 @@ def main():
     set_seed(args.seed)
     device = get_device()
     print("Using device:", device)
+    
+    
+    # 4. Load dữ liệu, tạo DataLoader
+    prepare_iwslt2015_en_vi(output_dir=args.data_dir)
 
     # 4.1 Load dữ liệu toy, bạn thay bằng load thật
-    train_src, train_tgt, val_src, val_tgt, test_src, test_tgt = load_parallel_corpus_dummy()
+    train_src, train_tgt, val_src, val_tgt, test_src, test_tgt = load_parallel_corpus_from_files(
+        root=args.data_dir,          
+        train_prefix="train",
+        val_prefix="val",
+        test_prefix="test",
+        src_ext="vi",
+        tgt_ext="en",
+    )
 
     # 4.2 Xây vocab và tokenizer đơn giản
     src_vocab = SimpleVocab(train_src + val_src + test_src)
     tgt_vocab = SimpleVocab(train_tgt + val_tgt + test_tgt)
     
     os.makedirs("checkpoints", exist_ok=True)
+    
+    torch.save(src_vocab.to_state(), "checkpoints/src_vocab.pt")
+    torch.save(tgt_vocab.to_state(), "checkpoints/tgt_vocab.pt")
 
     def src_tokenizer(text: str):
         return src_vocab.encode(text, add_bos_eos=False)
