@@ -227,6 +227,7 @@ def main():
     src_vocab = SimpleVocab(train_src + val_src + test_src)
     tgt_vocab = SimpleVocab(train_tgt + val_tgt + test_tgt)
     
+    os.makedirs("checkpoints", exist_ok=True)
     torch.save(src_vocab, "checkpoints/src_vocab.pt")
     torch.save(tgt_vocab, "checkpoints/tgt_vocab.pt")
 
