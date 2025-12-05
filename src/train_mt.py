@@ -228,8 +228,6 @@ def main():
     tgt_vocab = SimpleVocab(train_tgt + val_tgt + test_tgt)
     
     os.makedirs("checkpoints", exist_ok=True)
-    torch.save(src_vocab, "checkpoints/src_vocab.pt")
-    torch.save(tgt_vocab, "checkpoints/tgt_vocab.pt")
 
     def src_tokenizer(text: str):
         return src_vocab.encode(text, add_bos_eos=False)

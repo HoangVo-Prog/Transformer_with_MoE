@@ -8,6 +8,74 @@ from model import MoETransformerMT
 from utils import get_device, load_checkpoint
 
 
+class SimpleVocab:
+    def __init__(self, texts: List[str], min_freq: int = 1, specials=None):
+        if specials is None:
+            specials = ["<pad>", "<bos>", "<eos>", "<unk>"]
+
+        self.specials = specials
+        self.pad_token = "<pad>"
+        self.bos_token = "<bos>"
+        self.eos_token = "<eos>"
+        self.unk_token = "<unk>"
+
+        freq = {}
+        for line in texts:
+            for tok in line.strip().split():
+                freq[tok] = freq.get(tok, 0) + 1
+
+        vocab_list = list(self.specials)
+        for tok, c in freq.items():
+            if c >= min_freq and tok not in vocab_list:
+                vocab_list.append(tok)
+
+        self.itos = vocab_list
+        self.stoi = {t: i for i, t in enumerate(self.itos)}
+
+        self.pad_id = self.stoi[self.pad_token]
+        self.bos_id = self.stoi[self.bos_token]
+        self.eos_id = self.stoi[self.eos_token]
+        self.unk_id = self.stoi[self.unk_token]
+
+    def encode(self, text: str, add_bos_eos: bool = False):
+        toks = text.strip().split()
+        ids = [self.stoi.get(t, self.unk_id) for t in toks]
+        if add_bos_eos:
+            return [self.bos_id] + ids + [self.eos_id]
+        return ids
+
+    def decode(self, ids: List[int]) -> str:
+        toks = []
+        for i in ids:
+            if i == self.eos_id:
+                break
+            if i in (self.pad_id, self.bos_id):
+                continue
+            toks.append(self.itos[i])
+        return " ".join(toks)
+
+    def __len__(self):
+        return len(self.itos)
+
+
+def load_parallel_corpus_dummy():
+    train_src = [
+        "xin chao the gioi",
+        "toi dang thu train mo hinh",
+        "day la mot vi du don gian",
+    ]
+    train_tgt = [
+        "hello world",
+        "i am trying to train a model",
+        "this is a simple example",
+    ]
+    val_src = train_src
+    val_tgt = train_tgt
+    test_src = train_src
+    test_tgt = train_tgt
+    return train_src, train_tgt, val_src, val_tgt, test_src, test_tgt
+
+
 @torch.no_grad()
 def greedy_decode(
     model: MoETransformerMT,
@@ -64,9 +132,11 @@ def main():
     device = get_device()
     print("Using device:", device)
 
-    # 1. Load vocab đã lưu
-    src_vocab = torch.load("checkpoints/src_vocab.pt", map_location="cpu")
-    tgt_vocab = torch.load("checkpoints/tgt_vocab.pt", map_location="cpu")
+    # 1. Build vocab 
+    train_src, train_tgt, val_src, val_tgt, test_src, test_tgt = load_parallel_corpus_dummy()
+
+    src_vocab = SimpleVocab(train_src + val_src + test_src)
+    tgt_vocab = SimpleVocab(train_tgt + val_tgt + test_tgt)
 
     src_pad_id = src_vocab.pad_id
     tgt_pad_id = tgt_vocab.pad_id
