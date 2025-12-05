@@ -15,6 +15,8 @@ from data_module import create_dataloaders
 from utils import get_device, set_seed, save_checkpoint
 
 from prepare_vi_en_data import prepare_iwslt2015_en_vi
+from torch.cuda.amp import GradScaler, autocast
+
 
 
 def read_lines(path: str):
@@ -138,10 +140,13 @@ def train_one_epoch(
     device: torch.device,
     lambda_aux: float,
     grad_clip: float = 1.0,
+    scaler=None,
 ):
     model.train()
     total_loss = 0.0
     total_tokens = 0
+    
+    use_amp = scaler is not None
 
     start_epoch = time.time()
     for step, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
@@ -156,26 +161,58 @@ def train_one_epoch(
         tgt_pad_mask = tgt_pad_mask.to(device, non_blocking=True)
         t_after_to = time.time()
 
-        logits, aux_loss = model(
-            src_ids=src_ids,
-            tgt_ids_in=tgt_in,
-            src_key_padding_mask=src_pad_mask,
-            tgt_key_padding_mask=tgt_pad_mask,
-        )
-        t_after_forward = time.time()
-
-        B, T, V = logits.size()
-        loss_main = criterion(
-            logits.view(B * T, V),
-            tgt_out.view(B * T),
-        )
-        loss = loss_main + lambda_aux * aux_loss
-
         optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-        optimizer.step()
-        
+
+        # -------------------------
+        #       AMP TRAINING
+        # -------------------------
+        if use_amp:
+            with autocast():
+                logits, aux_loss = model(
+                    src_ids=src_ids,
+                    tgt_ids_in=tgt_in,
+                    src_key_padding_mask=src_pad_mask,
+                    tgt_key_padding_mask=tgt_pad_mask,
+                )
+                B, T, V = logits.size()
+                loss_main = criterion(
+                    logits.view(B * T, V),
+                    tgt_out.view(B * T),
+                )
+                loss = loss_main + lambda_aux * aux_loss
+
+            t_after_forward = time.time()
+
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+            scaler.step(optimizer)
+            scaler.update()
+
+        # -------------------------
+        #     FP32 TRAINING
+        # -------------------------
+        else:
+            logits, aux_loss = model(
+                src_ids=src_ids,
+                tgt_ids_in=tgt_in,
+                src_key_padding_mask=src_pad_mask,
+                tgt_key_padding_mask=tgt_pad_mask,
+            )
+
+            B, T, V = logits.size()
+            loss_main = criterion(
+                logits.view(B * T, V),
+                tgt_out.view(B * T),
+            )
+            loss = loss_main + lambda_aux * aux_loss
+
+            t_after_forward = time.time()
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+            optimizer.step()
+
         t_after_step = time.time()
 
         if step % 100 == 0:
@@ -202,39 +239,66 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     lambda_aux: float,
+    scaler=None,          # thêm scaler để biết có dùng AMP hay không
 ):
     model.eval()
     total_loss = 0.0
     total_tokens = 0
 
+    use_amp = scaler is not None
+
     for batch in val_loader:
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
-        src_ids = src_ids.to(device)
-        tgt_in = tgt_in.to(device)
-        tgt_out = tgt_out.to(device)
-        src_pad_mask = src_pad_mask.to(device)
-        tgt_pad_mask = tgt_pad_mask.to(device)
 
-        logits, aux_loss = model(
-            src_ids=src_ids,
-            tgt_ids_in=tgt_in,
-            src_key_padding_mask=src_pad_mask,
-            tgt_key_padding_mask=tgt_pad_mask,
-        )
+        src_ids = src_ids.to(device, non_blocking=True)
+        tgt_in = tgt_in.to(device, non_blocking=True)
+        tgt_out = tgt_out.to(device, non_blocking=True)
+        src_pad_mask = src_pad_mask.to(device, non_blocking=True)
+        tgt_pad_mask = tgt_pad_mask.to(device, non_blocking=True)
 
-        B, T, V = logits.size()
-        loss_main = criterion(
-            logits.view(B * T, V),
-            tgt_out.view(B * T),
-        )
-        loss = loss_main + lambda_aux * aux_loss
+        # -------------------------
+        #      AMP (autocast)
+        # -------------------------
+        if use_amp:
+            with autocast():
+                logits, aux_loss = model(
+                    src_ids=src_ids,
+                    tgt_ids_in=tgt_in,
+                    src_key_padding_mask=src_pad_mask,
+                    tgt_key_padding_mask=tgt_pad_mask,
+                )
 
+                B, T, V = logits.size()
+                loss_main = criterion(
+                    logits.view(B * T, V),
+                    tgt_out.view(B * T),
+                )
+                loss = loss_main + lambda_aux * aux_loss
+
+        # -------------------------
+        #      FP32 evaluation
+        # -------------------------
+        else:
+            logits, aux_loss = model(
+                src_ids=src_ids,
+                tgt_ids_in=tgt_in,
+                src_key_padding_mask=src_pad_mask,
+                tgt_key_padding_mask=tgt_pad_mask,
+            )
+
+            B, T, V = logits.size()
+            loss_main = criterion(
+                logits.view(B * T, V),
+                tgt_out.view(B * T),
+            )
+            loss = loss_main + lambda_aux * aux_loss
+
+        # thống kê
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
         total_loss += loss_main.item() * non_pad
         total_tokens += non_pad
 
     return total_loss / max(1, total_tokens)
-
 
 # =========================
 # 4. Main
@@ -258,11 +322,14 @@ def main():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lambda_aux", type=float, default=1e-2)
     parser.add_argument("--checkpoint", type=str, default="checkpoints/mt_moe.pt")
+    parser.add_argument("--use_amp", action="store_true", help="Use Automatic Mixed Precision training")
     args = parser.parse_args()
 
     set_seed(args.seed)
     device = get_device()
     print("Using device:", device)
+    
+    scaler = GradScaler()
     
     
     # 4. Load dữ liệu, tạo DataLoader
@@ -351,6 +418,7 @@ def main():
             criterion=criterion,
             device=device,
             lambda_aux=args.lambda_aux,
+            scaler=scaler
         )
 
         val_loss = evaluate(
@@ -359,6 +427,7 @@ def main():
             criterion=criterion,
             device=device,
             lambda_aux=args.lambda_aux,
+            scaler=scaler,
         )
 
         print(
