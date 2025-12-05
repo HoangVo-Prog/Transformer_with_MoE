@@ -3,6 +3,7 @@ import argparse
 import math, time
 import os
 from typing import List, Tuple
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -143,7 +144,7 @@ def train_one_epoch(
     total_tokens = 0
 
     start_epoch = time.time()
-    for step, batch in enumerate(train_loader):
+    for step, batch in tqdm(enumerate(train_loader)):
         t0 = time.time()
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
         t_after_batch = time.time()
