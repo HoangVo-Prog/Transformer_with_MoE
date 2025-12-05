@@ -18,7 +18,7 @@ from prepare_vi_en_data import prepare_iwslt2015_en_vi
 
 def read_lines(path: str):
     with open(path, encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+        return [line.rstrip("\n") for line in f]
 
 
 def load_parallel_corpus_from_files(
