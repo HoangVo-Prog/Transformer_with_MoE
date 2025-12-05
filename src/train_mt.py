@@ -316,7 +316,7 @@ def main():
     parser.add_argument("--n_experts", type=int, default=2)
     parser.add_argument("--max_len", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--epochs", type=int, default=10)
