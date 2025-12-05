@@ -179,9 +179,9 @@ def main():
 
     # 5. Ví dụ vài câu tiếng Việt cần dịch
     examples = [
-        "xin chao the gioi",
-        "toi dang thu train mo hinh dich",
-        "day la mot vi du don gian",
+        "xin chao ban",
+        "hom nay troi dep",
+        "toi dang hoc mo hinh transformer",
     ]
 
     for sent in examples:
