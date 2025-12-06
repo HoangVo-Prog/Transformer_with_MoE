@@ -24,8 +24,17 @@ class TranslationDataset(Dataset):
         for src, tgt in zip(src_texts, tgt_texts):
             s_ids = src_tokenizer(src)[: self.max_len]
             t_ids = tgt_tokenizer(tgt)[: self.max_len]
+            
+            # bỏ các cặp mà 1 trong 2 bên rỗng
+            if len(s_ids) == 0 or len(t_ids) == 0:
+                continue
             self.src_ids.append(torch.tensor(s_ids, dtype=torch.long))
             self.tgt_ids.append(torch.tensor(t_ids, dtype=torch.long))
+        
+        num_empty_src = sum(len(s) == 0 for s in self.src_ids)
+        num_empty_tgt = sum(len(t) == 0 for t in self.tgt_ids)
+        print("Empty src:", num_empty_src, "Empty tgt:", num_empty_tgt)
+
 
     def __len__(self):
         return len(self.src_ids)
