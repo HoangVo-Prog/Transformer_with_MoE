@@ -93,14 +93,27 @@ class MoELayer(nn.Module):
         out = out_flat.view(B, S, D)
         return out, aux_loss
 
-    def _aux_loss(self, gate):
+    def _aux_loss(self, gate: torch.Tensor):
         """
         gate: [B, S, n_experts]
-        Load balancing loss kiểu GShard rất đơn giản
+        Tính ở fp32 và có epsilon để tránh log(0).
         """
-        expert_prob = gate.mean(dim=(0, 1))        # [n_experts]
-        balance_loss = torch.sum(expert_prob * torch.log(expert_prob + 1e-9))
+        # chuyển sang float32 để tránh vấn đề fp16
+        gate = gate.float()
+
+        # xác suất mỗi expert
+        expert_prob = gate.mean(dim=(0, 1))       # [E]
+        expert_prob = expert_prob + 1e-9          # tránh 0
+
+        # chuẩn hóa lại cho chắc
+        expert_prob = expert_prob / expert_prob.sum()
+
+        balance_loss = torch.sum(expert_prob * torch.log(expert_prob))
+        # đảm bảo finite
+        if not torch.isfinite(balance_loss):
+            balance_loss = torch.zeros((), device=gate.device, dtype=gate.dtype)
         return balance_loss
+
 
 # ===== Positional encoding =====
 

@@ -288,6 +288,19 @@ def evaluate(
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
         total_loss += loss.item() * non_pad
         total_tokens += non_pad
+        
+        if torch.isnan(loss) or torch.isinf(loss):
+            print("Found NaN or Inf in loss, debug info:")
+            print("  lambda_aux:", lambda_aux)
+            print("  loss_main:", loss_main.detach().cpu().item())
+            if aux_loss is not None:
+                print("  aux_loss:", aux_loss.detach().cpu().item())
+            # thêm check logits nếu cần
+            print("  any NaN in logits:", torch.isnan(logits).any().item())
+            print("  any Inf in logits:", torch.isinf(logits).any().item())
+            # bạn có thể raise luôn để không train tiếp
+            raise RuntimeError("NaN or Inf in loss")
+
 
     return total_loss / max(1, total_tokens)
 
@@ -300,12 +313,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--data-dir", type=str, default="data")
-    parser.add_argument("--d_model", type=int, default=768)
+    parser.add_argument("--d_model", type=int, default=128) # 768
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
     parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=1024)
-    parser.add_argument("--n_experts", type=int, default=4)
+    parser.add_argument("--d_ff", type=int, default=256) # 1024
+    parser.add_argument("--n_experts", type=int, default=2) # 4
     parser.add_argument("--max_len", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--batch_size", type=int, default=24)
