@@ -148,7 +148,7 @@ def train_one_epoch(
     
     use_amp = scaler is not None
 
-    for batch in tqdm(train_loader):
+    for batch in tqdm(train_loader, miniters=500):
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
 
         src_ids = src_ids.to(device, non_blocking=True)
