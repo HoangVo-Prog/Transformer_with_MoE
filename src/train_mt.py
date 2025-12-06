@@ -131,7 +131,6 @@ class SimpleVocab:
 # =========================
 # 3. Train, eval loop
 # =========================
-
 def train_one_epoch(
     model: MoETransformerMT,
     train_loader: DataLoader,
@@ -200,6 +199,11 @@ def train_one_epoch(
                 tgt_out.view(B * T),
             )
             loss = loss_main + lambda_aux * aux_loss
+            
+            if lambda_aux is not None and lambda_aux > 0.0 and aux_loss is not None:
+                loss = loss_main + lambda_aux * aux_loss
+            else:
+                loss = loss_main
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
@@ -220,7 +224,7 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     lambda_aux: float,
-    scaler=None,          # thêm scaler để biết có dùng AMP hay không
+    scaler=None,          
 ):
     model.eval()
     total_loss = 0.0
@@ -248,14 +252,11 @@ def evaluate(
                     src_key_padding_mask=src_pad_mask,
                     tgt_key_padding_mask=tgt_pad_mask,
                 )
-
                 B, T, V = logits.size()
                 loss_main = criterion(
                     logits.view(B * T, V),
                     tgt_out.view(B * T),
                 )
-                loss = loss_main + lambda_aux * aux_loss
-
         # -------------------------
         #      FP32 evaluation
         # -------------------------
@@ -266,20 +267,30 @@ def evaluate(
                 src_key_padding_mask=src_pad_mask,
                 tgt_key_padding_mask=tgt_pad_mask,
             )
-
             B, T, V = logits.size()
             loss_main = criterion(
                 logits.view(B * T, V),
                 tgt_out.view(B * T),
             )
+
+        # Gộp aux loss một cách an toàn
+        if (
+            lambda_aux is not None
+            and lambda_aux > 0.0
+            and aux_loss is not None
+            and torch.isfinite(aux_loss)
+        ):
             loss = loss_main + lambda_aux * aux_loss
+        else:
+            loss = loss_main
 
         # thống kê
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
-        total_loss += loss_main.item() * non_pad
+        total_loss += loss.item() * non_pad
         total_tokens += non_pad
 
     return total_loss / max(1, total_tokens)
+
 
 # =========================
 # 4. Main
