@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-python src/train_mt.py --use-amp 
+python src/train_mt.py --use_amp 
