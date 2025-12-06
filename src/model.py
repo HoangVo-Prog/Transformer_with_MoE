@@ -215,7 +215,7 @@ class DecoderMoELayer(nn.Module):
             tgt,
             tgt,
             attn_mask=tgt_mask,
-            key_padding_mask=tgt_key_padding_mask,
+            # key_padding_mask=tgt_key_padding_mask,
         )
         tgt = tgt + self.dropout(self_attn_out)
         tgt = self.ln1(tgt)
@@ -336,7 +336,8 @@ class MoETransformerMT(nn.Module):
                 out,
                 memory,
                 tgt_mask=tgt_mask,
-                tgt_key_padding_mask=tgt_key_padding_mask,
+                # tgt_key_padding_mask=tgt_key_padding_mask,
+                tgt_key_padding_mask=None,
                 memory_key_padding_mask=src_key_padding_mask,
             )
             total_aux_loss = total_aux_loss + aux_loss
