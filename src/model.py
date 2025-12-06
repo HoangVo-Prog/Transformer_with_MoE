@@ -66,7 +66,8 @@ class MoELayer(nn.Module):
         x_flat = x.view(N, D)                    # [N, D]
         out_flat = torch.zeros_like(x_flat)      # [N, D]
 
-        aux_loss = self._aux_loss(gate)
+        with torch.cuda.amp.autocast(enabled=False):
+            aux_loss = self._aux_loss(gate.float())
 
         # Flatten top2
         top2_val_flat = top2_val.view(N, 2)      # [N, 2]

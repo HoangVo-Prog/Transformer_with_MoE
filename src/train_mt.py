@@ -148,19 +148,15 @@ def train_one_epoch(
     
     use_amp = scaler is not None
 
-    start_epoch = time.time()
-    for step, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
-        t0 = time.time()
+    for batch in train_loader:
         src_ids, tgt_in, tgt_out, src_pad_mask, tgt_pad_mask = batch
-        t_after_batch = time.time()
 
         src_ids = src_ids.to(device, non_blocking=True)
         tgt_in = tgt_in.to(device, non_blocking=True)
         tgt_out = tgt_out.to(device, non_blocking=True)
         src_pad_mask = src_pad_mask.to(device, non_blocking=True)
         tgt_pad_mask = tgt_pad_mask.to(device, non_blocking=True)
-        t_after_to = time.time()
-
+        
         optimizer.zero_grad()
 
         # -------------------------
@@ -180,8 +176,6 @@ def train_one_epoch(
                     tgt_out.view(B * T),
                 )
                 loss = loss_main + lambda_aux * aux_loss
-
-            t_after_forward = time.time()
 
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
@@ -207,22 +201,9 @@ def train_one_epoch(
             )
             loss = loss_main + lambda_aux * aux_loss
 
-            t_after_forward = time.time()
-
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
-
-        t_after_step = time.time()
-
-        if step % 100 == 0:
-            print(
-                f"step {step} "
-                f"batch {t_after_batch - t0:.3f}s "
-                f"to(device) {t_after_to - t_after_batch:.3f}s "
-                f"forward {t_after_forward - t_after_to:.3f}s "
-                f"opt {t_after_step - t_after_forward:.3f}s"
-            )
 
         # thống kê
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
@@ -410,7 +391,7 @@ def main():
     best_val_loss = float("inf")
 
     # 4.6 Vòng lặp train
-    for epoch in range(1, args.epochs + 1):
+    for epoch in tqdm(range(1, args.epochs + 1)):
         train_loss = train_one_epoch(
             model=model,
             train_loader=train_loader,
