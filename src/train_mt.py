@@ -139,12 +139,12 @@ def train_one_epoch(
     device: torch.device,
     lambda_aux: float,
     grad_clip: float = 1.0,
-    scaler=None,
+    scaler: GradScaler | None = None,
 ):
     model.train()
     total_loss = 0.0
     total_tokens = 0
-    
+
     use_amp = scaler is not None
 
     for batch in train_loader:
@@ -155,8 +155,8 @@ def train_one_epoch(
         tgt_out = tgt_out.to(device, non_blocking=True)
         src_pad_mask = src_pad_mask.to(device, non_blocking=True)
         tgt_pad_mask = tgt_pad_mask.to(device, non_blocking=True)
-        
-        optimizer.zero_grad()
+
+        optimizer.zero_grad(set_to_none=True)
 
         # -------------------------
         #       AMP TRAINING
@@ -185,9 +185,16 @@ def train_one_epoch(
                 else:
                     loss = loss_main
 
+            # backward + update với scaler
+            scaler.scale(loss).backward()
+            # unscale để clip chuẩn
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+            scaler.step(optimizer)
+            scaler.update()
 
         # -------------------------
-        #     FP32 TRAINING
+        #       FP32 TRAINING
         # -------------------------
         else:
             logits, aux_loss = model(
@@ -214,20 +221,22 @@ def train_one_epoch(
                 loss = loss_main
 
             loss.backward()
-            
-            with torch.no_grad():
-                gnorm = 0.0
-                for p in model.parameters():
-                    if p.grad is not None:
-                        gnorm += p.grad.data.norm(2).item() ** 2
-                gnorm = gnorm ** 0.5
-            print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
+
+            # debug grad norm nếu muốn
+            # with torch.no_grad():
+            #     gnorm = 0.0
+            #     for p in model.parameters():
+            #         if p.grad is not None:
+            #             gnorm += p.grad.data.norm(2).item() ** 2
+            #     gnorm = gnorm ** 0.5
+            # print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
 
-
-        # thống kê
+        # -------------------------
+        #       THỐNG KÊ
+        # -------------------------
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
         total_loss += loss_main.item() * non_pad
         total_tokens += non_pad
