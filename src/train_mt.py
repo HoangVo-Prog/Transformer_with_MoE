@@ -174,13 +174,17 @@ def train_one_epoch(
                     logits.view(B * T, V),
                     tgt_out.view(B * T),
                 )
-                loss = loss_main + lambda_aux * aux_loss
 
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            scaler.step(optimizer)
-            scaler.update()
+                if (
+                    lambda_aux is not None
+                    and lambda_aux > 0.0
+                    and aux_loss is not None
+                    and torch.isfinite(aux_loss)
+                ):
+                    loss = loss_main + lambda_aux * aux_loss
+                else:
+                    loss = loss_main
+
 
         # -------------------------
         #     FP32 TRAINING
@@ -198,9 +202,13 @@ def train_one_epoch(
                 logits.view(B * T, V),
                 tgt_out.view(B * T),
             )
-            loss = loss_main + lambda_aux * aux_loss
-            
-            if lambda_aux is not None and lambda_aux > 0.0 and aux_loss is not None:
+
+            if (
+                lambda_aux is not None
+                and lambda_aux > 0.0
+                and aux_loss is not None
+                and torch.isfinite(aux_loss)
+            ):
                 loss = loss_main + lambda_aux * aux_loss
             else:
                 loss = loss_main
@@ -208,6 +216,7 @@ def train_one_epoch(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
+
 
         # thống kê
         non_pad = tgt_out.ne(criterion.ignore_index).sum().item()
