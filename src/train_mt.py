@@ -334,8 +334,7 @@ def main():
     device = get_device()
     print("Using device:", device)
     
-    scaler = GradScaler()
-    
+    scaler = GradScaler() if args.use_amp else None
     
     # 4. Load dữ liệu, tạo DataLoader
     prepare_iwslt2015_en_vi(output_dir=args.data_dir)
