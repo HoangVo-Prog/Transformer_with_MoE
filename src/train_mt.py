@@ -322,11 +322,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--data-dir", type=str, default="data")
-    parser.add_argument("--d_model", type=int, default=128) # 768
+    parser.add_argument("--d_model", type=int, default=768) # 768
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
     parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=256) # 1024
+    parser.add_argument("--d_ff", type=int, default=1024) # 1024
     parser.add_argument("--n_experts", type=int, default=4) # 4
     parser.add_argument("--max_len", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.1)
@@ -444,7 +444,7 @@ def main():
         )
 
         print(
-            f"Epoch {epoch:03d} | "
+            f"\nEpoch {epoch:03d} | "
             f"train loss {train_loss:.4f} | "
             f"val loss {val_loss:.4f}"
         )
