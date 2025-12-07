@@ -214,6 +214,15 @@ def train_one_epoch(
                 loss = loss_main
 
             loss.backward()
+            
+            with torch.no_grad():
+                gnorm = 0.0
+                for p in model.parameters():
+                    if p.grad is not None:
+                        gnorm += p.grad.data.norm(2).item() ** 2
+                gnorm = gnorm ** 0.5
+            print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
 
@@ -322,11 +331,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--data-dir", type=str, default="data")
-    parser.add_argument("--d_model", type=int, default=768) # 768
+    parser.add_argument("--d_model", type=int, default=128) # 768
     parser.add_argument("--nhead", type=int, default=4)
     parser.add_argument("--num_enc_layers", type=int, default=3)
     parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=1024) # 1024
+    parser.add_argument("--d_ff", type=int, default=256) # 1024
     parser.add_argument("--n_experts", type=int, default=4) # 4
     parser.add_argument("--max_len", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.1)
