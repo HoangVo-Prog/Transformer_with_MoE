@@ -8,6 +8,11 @@ from model import MoETransformerMT
 from utils import get_device, load_checkpoint
 from train_mt import SimpleVocab
 
+from config import (
+    D_MODEL, NHEAD, NUM_ENC_LAYERS, NUM_DEC_LAYERS,
+    D_FF, N_EXPERTS, MAX_LEN, DROPOUT,
+)
+
 
 @torch.no_grad()
 def greedy_decode(
@@ -76,29 +81,19 @@ def main():
     tgt_pad_id = tgt_vocab.pad_id
     bos_id = tgt_vocab.bos_id
     eos_id = tgt_vocab.eos_id
-
-
-    # 2. Khởi tạo model với đúng cấu hình như lúc train
-    d_model = 256
-    nhead = 4
-    num_enc_layers = 3
-    num_dec_layers = 3
-    d_ff = 1024
-    n_experts = 8
-    max_len_model = 128
-    dropout = 0.1
-
+    
+    # 2. Khởi tạo model
     model = MoETransformerMT(
         src_vocab_size=len(src_vocab),
         tgt_vocab_size=len(tgt_vocab),
-        d_model=d_model,
-        nhead=nhead,
-        num_encoder_layers=num_enc_layers,
-        num_decoder_layers=num_dec_layers,
-        d_ff=d_ff,
-        n_experts=n_experts,
-        max_len=max_len_model,
-        dropout=dropout,
+        d_model=D_MODEL,
+        nhead=NHEAD,
+        num_encoder_layers=NUM_ENC_LAYERS,
+        num_decoder_layers=NUM_DEC_LAYERS,
+        d_ff=D_FF,
+        n_experts=N_EXPERTS,
+        max_len=MAX_LEN,
+        dropout=DROPOUT,
     ).to(device)
 
     # 3. Load checkpoint tốt nhất

@@ -17,7 +17,10 @@ from utils import get_device, set_seed, save_checkpoint
 from prepare_vi_en_data import prepare_iwslt2015_en_vi
 from torch.cuda.amp import GradScaler, autocast
 
-
+from config import (
+    D_MODEL, NHEAD, NUM_ENC_LAYERS, NUM_DEC_LAYERS,
+    D_FF, N_EXPERTS, MAX_LEN, DROPOUT,
+)
 
 def read_lines(path: str):
     with open(path, encoding="utf-8") as f:
@@ -227,14 +230,6 @@ def train_one_epoch(
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
             
-        # debug grad norm nếu muốn
-        with torch.no_grad():
-            gnorm = 0.0
-            for p in model.parameters():
-                if p.grad is not None:
-                    gnorm += p.grad.data.norm(2).item() ** 2
-            gnorm = gnorm ** 0.5
-            print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
 
         # -------------------------
         #       THỐNG KÊ
@@ -342,14 +337,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--data-dir", type=str, default="data")
-    parser.add_argument("--d_model", type=int, default=768) # 768
-    parser.add_argument("--nhead", type=int, default=4)
-    parser.add_argument("--num_enc_layers", type=int, default=3)
-    parser.add_argument("--num_dec_layers", type=int, default=3)
-    parser.add_argument("--d_ff", type=int, default=1024) # 1024
-    parser.add_argument("--n_experts", type=int, default=4) # 4
-    parser.add_argument("--max_len", type=int, default=32)
-    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--d_model", type=int, default=D_MODEL) 
+    parser.add_argument("--nhead", type=int, default=NHEAD)
+    parser.add_argument("--num_enc_layers", type=int, default=NUM_ENC_LAYERS)
+    parser.add_argument("--num_dec_layers", type=int, default=NUM_DEC_LAYERS)
+    parser.add_argument("--d_ff", type=int, default=D_FF) 
+    parser.add_argument("--n_experts", type=int, default=N_EXPERTS) 
+    parser.add_argument("--max_len", type=int, default=MAX_LEN)
+    parser.add_argument("--dropout", type=float, default=DROPOUT)
     parser.add_argument("--batch_size", type=int, default=24)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-4)
