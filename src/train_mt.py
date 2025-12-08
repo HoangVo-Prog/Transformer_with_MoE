@@ -138,7 +138,7 @@ def train_one_epoch(
     criterion: nn.Module,
     device: torch.device,
     lambda_aux: float,
-    grad_clip: float = 1.0,
+    grad_clip: float = 0.5,
     scaler: GradScaler | None = None,
 ):
     model.train()
@@ -222,17 +222,19 @@ def train_one_epoch(
 
             loss.backward()
 
-            # debug grad norm nếu muốn
-            # with torch.no_grad():
-            #     gnorm = 0.0
-            #     for p in model.parameters():
-            #         if p.grad is not None:
-            #             gnorm += p.grad.data.norm(2).item() ** 2
-            #     gnorm = gnorm ** 0.5
-            # print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
+            
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
+            
+        # debug grad norm nếu muốn
+        with torch.no_grad():
+            gnorm = 0.0
+            for p in model.parameters():
+                if p.grad is not None:
+                    gnorm += p.grad.data.norm(2).item() ** 2
+            gnorm = gnorm ** 0.5
+            print(f"[DEBUG] epoch step grad norm: {gnorm:.6f}")
 
         # -------------------------
         #       THỐNG KÊ
@@ -350,7 +352,7 @@ def main():
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--batch_size", type=int, default=24)
     parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lambda_aux", type=float, default=1e-2)
     parser.add_argument("--checkpoint", type=str, default="checkpoints/mt_moe.pt")
