@@ -55,7 +55,7 @@ def greedy_decode(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--checkpoints",
+        "--checkpoint-dir",
         type=str,
         default="checkpoints",
         help="Path tới best checkpoint",
