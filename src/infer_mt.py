@@ -72,6 +72,10 @@ def main():
         default=60,
         help="Độ dài tối đa câu dịch",
     )
+    parser.add_argument(
+        "--sentences", type=str, nargs='*', default=None, help="Sentences to translate"
+    )
+    
     args = parser.parse_args()
 
     device = get_device()
@@ -114,14 +118,7 @@ def main():
     def decode_tgt(ids: List[int]) -> str:
         return tgt_vocab.decode(ids)
 
-    # 5. Ví dụ vài câu tiếng Việt cần dịch
-    examples = [
-        "xin chao ban",
-        "hom nay troi dep",
-        "toi dang hoc mo hinh transformer",
-    ]
-
-    for sent in examples:
+    for sent in args.sentences:
         ids = encode_src(sent)
         src_tensor = torch.tensor(ids, dtype=torch.long).unsqueeze(0).to(device)
         src_pad_mask = src_tensor.eq(src_pad_id)
