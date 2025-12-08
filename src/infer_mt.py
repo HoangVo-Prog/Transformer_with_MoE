@@ -104,7 +104,7 @@ def main():
     ).to(device)
 
     # 3. Load checkpoint tốt nhất
-    print(f"Loading checkpoint from {args.checkpoint}")
+    print(f"Loading checkpoint from {args.checkpoint_dir}")
     load_checkpoint(os.path.join(args.checkpoint_dir, args.checkpoint_name), model, optimizer=None)
 
     # 4. Hàm encode và decode sử dụng vocab đã lưu
