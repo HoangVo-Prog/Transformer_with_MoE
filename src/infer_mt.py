@@ -7,6 +7,7 @@ import torch
 from model import MoETransformerMT
 from utils import get_device, load_checkpoint
 from train_mt import SimpleVocab
+import os
 
 from config import (
     D_MODEL, NHEAD, NUM_ENC_LAYERS, NUM_DEC_LAYERS,
@@ -54,10 +55,16 @@ def greedy_decode(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--checkpoint",
+        "--checkpoint-dir",
         type=str,
-        default="checkpoints/mt_moe.pt",
+        default="checkpoints",
         help="Path tới best checkpoint",
+    )
+    parser.add_argument(
+        "--checkpoint-name",
+        type=str,
+        default="mt_moe.pt",
+        help="MoE checkpoint file name",
     )
     parser.add_argument(
         "--max_len",
@@ -71,8 +78,8 @@ def main():
     print("Using device:", device)
 
     # 1. Build vocab 
-    src_state = torch.load("checkpoints/src_vocab.pt", map_location="cpu")
-    tgt_state = torch.load("checkpoints/tgt_vocab.pt", map_location="cpu")
+    src_state = torch.load(f"{args.checkpoint_dir}/src_vocab.pt", map_location="cpu")
+    tgt_state = torch.load(f"{args.checkpoint_dir}/tgt_vocab.pt", map_location="cpu")
 
     src_vocab = SimpleVocab.from_state(src_state)
     tgt_vocab = SimpleVocab.from_state(tgt_state)
@@ -98,7 +105,7 @@ def main():
 
     # 3. Load checkpoint tốt nhất
     print(f"Loading checkpoint from {args.checkpoint}")
-    load_checkpoint(args.checkpoint, model, optimizer=None)
+    load_checkpoint(os.path.join(args.checkpoint_dir, args.checkpoint_name), model, optimizer=None)
 
     # 4. Hàm encode và decode sử dụng vocab đã lưu
     def encode_src(text: str):
